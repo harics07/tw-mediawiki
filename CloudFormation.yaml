@@ -1,0 +1,168 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: The following template creates Autoscaling Group, Launch Configuration, Load Balancer, Target Group and EC2.
+
+
+Parameters:
+  GoldenAmiId:
+    Type: String
+  KeyPair:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Description: List outs existing key pair 
+  IPRange:
+    Type: String
+    Description: The following IP will be updated in Security Group for SSH and Webserver.  
+  VPC:
+    Type: 'AWS::EC2::VPC::Id'
+  PublicSubnet1:
+    Type: 'AWS::EC2::Subnet::Id'
+  PublicSubnet2:
+    Type: 'AWS::EC2::Subnet::Id'
+  PublicSubnet3:
+    Type: 'AWS::EC2::Subnet::Id'
+
+Resources:
+  EC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: ami-07f403ad6645d25b0
+      InstanceType: t3.micro
+      SubnetId: !Ref PublicSubnet1
+      KeyName: !Ref KeyPair
+      EbsOptimized: 'true'
+      Tenancy: default
+      SecurityGroupIds:
+        - !Ref JenkinsSG
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: '20'
+            DeleteOnTermination: 'true'
+            Encrypted: 'false'
+      Tags:
+        - Key: Name
+          Value: Jenkins-VM
+  JenkinsSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "jenkins-sg"
+      GroupDescription: "Security Group for Jenkins"
+      VpcId: !Ref VPC 
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref IPRange
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: !Ref IPRange   
+      Tags:
+        - Key: Name
+          Value: jenkins-sg        
+  EC2InstanceSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "hari-vm-sg"
+      GroupDescription: "Security Group for MediaWiki"
+      VpcId: !Ref VPC 
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref IPRange
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref IPRange   
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref VPC     
+      Tags:
+        - Key: Name
+          Value: hari-vm-sg
+  LoadBalancerSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "alb-sg"
+      GroupDescription: "Security Group for LoadBalancer"
+      VpcId: !Ref VPC 
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0       
+      Tags:
+        - Key: Name
+          Value: alb-sg
+  ASGLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties: 
+      LaunchConfigurationName: !Sub ${AWS::StackName}-ASG
+      ImageId: !Ref GoldenAmiId
+      SecurityGroups:
+        - !Ref EC2InstanceSG
+      InstanceType: t3.micro
+      KeyName: !Ref KeyPair 
+      EbsOptimized: 'true'
+  ASGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub ${AWS::StackName}-AutoScaling
+      MinSize: '1'
+      MaxSize: '2'
+      DesiredCapacity: '1'
+      HealthCheckGracePeriod: 300
+      LaunchConfigurationName: !Ref ASGLaunchConfig
+      TargetGroupARNs: 
+        - !Ref MWTargetGroup1
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1
+  MWLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: MW-ALB
+      Scheme: "internet-facing"
+      IpAddressType: ipv4
+      Type: application
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+        - !Ref PublicSubnet3
+      SecurityGroups:
+        - !Ref LoadBalancerSG 
+  MWLoadBalancerListener1:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref MWLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref MWTargetGroup1 
+  MWTargetGroup1:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 6
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      Matcher:
+        HttpCode: '200-301'
+      Name: MW-TG
+      VpcId: !Ref VPC
+      Port: 80
+      Protocol: HTTP
+
+Outputs:
+  SecurityGroups:
+    Value: !Join [ ",", [ !Ref EC2InstanceSG, !Ref LoadBalancerSG, !Ref JenkinsSG ]]      
+  ASLaunchConfig:
+    Value: !Ref ASGLaunchConfig
+  AutoScalingGroup:
+    Value: !Ref ASGroup
+  Instance:
+    Value: !Ref EC2Instance     
