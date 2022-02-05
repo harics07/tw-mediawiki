@@ -29,4 +29,7 @@ The default skin by mediawiki package
 
 The updated skin for mediawiki via Jenkins,
 
+![mw-4](https://user-images.githubusercontent.com/76770914/152634135-d7ad5acb-aaeb-480e-a189-80042116aa7b.JPG)
+
+
 ![mw-2](https://user-images.githubusercontent.com/76770914/152439534-8f504f3b-853c-4259-8aa2-bd2a41df73ca.JPG)
