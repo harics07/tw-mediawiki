@@ -7,7 +7,8 @@ The CloudFormation template executes the below resources,
 2. AutoScaling Group
 3. LoadBalancer
 
-The below snapshots are demonstration of updating a skin i.e Foreground changes to mediawiki application
+The below snapshots are demonstration of updating a skin i.e Foreground changes to mediawiki application.
+
 To perform this we require,
 1. LocalSettings.php
 2. OpenSource skins package from mediawiki.org
@@ -19,8 +20,6 @@ OverView
 Infra-Architecture
 
 ![architecture](https://user-images.githubusercontent.com/76770914/152633937-9224aeec-f4ca-4e6d-84e0-a2d6a2b8af9c.jpg)
-
-
 
 
 The default skin by mediawiki package
